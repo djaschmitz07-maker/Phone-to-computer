@@ -1,0 +1,898 @@
+# Cannon Blast: Rock Breaker
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cannon Blast: Rock Breaker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            background-color: #111827;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 540px;
+            max-height: 960px;
+            background: linear-gradient(180deg, #1e293b 0%, #3b82f6 65%, #93c5fd 100%);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 18px 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-badge {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .hud-badge span {
+            color: #fbbf24;
+        }
+
+        /* Control Zone Hints */
+        .touch-hint {
+            position: absolute;
+            bottom: 95px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.55);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        #hint-left {
+            left: 24px;
+        }
+
+        #hint-right {
+            right: 24px;
+        }
+
+        /* Overlays */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(6px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 24px;
+            z-index: 20;
+            color: white;
+            transition: opacity 0.25s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .game-title {
+            font-size: 2.8rem;
+            font-weight: 900;
+            line-height: 1.05;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fde047 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.4));
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: #cbd5e1;
+            max-width: 320px;
+            line-height: 1.5;
+            margin-bottom: 28px;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            padding: 16px 42px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #14532d, 0 12px 24px rgba(0, 0, 0, 0.4);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #14532d, 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .stats-box {
+            background: rgba(30, 41, 59, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 18px;
+            padding: 18px 32px;
+            margin-bottom: 28px;
+            min-width: 220px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            font-size: 1.15rem;
+            margin: 6px 0;
+            font-weight: 700;
+        }
+
+        .stat-val {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="hud-badge">SCORE: <span id="scoreDisplay">0</span></div>
+        <div class="hud-badge">BEST: <span id="bestDisplay">0</span></div>
+    </div>
+
+    <div id="hint-left" class="touch-hint">◀ Hold Left</div>
+    <div id="hint-right" class="touch-hint">Hold Right ▶</div>
+
+    <!-- Start Screen -->
+    <div id="startScreen" class="overlay">
+        <h1 class="game-title">Cannon<br>Blast</h1>
+        <p class="subtitle">
+            Click or hold the <strong>left side</strong> of the screen to roll left, and the <strong>right side</strong> to roll right.<br><br>
+            Your cannon shoots automatically! Split big rocks (10) into medium (5) and tiny (2) rocks before they hit you.
+        </p>
+        <button class="btn" id="startBtn">Play Game</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="overlay hidden">
+        <h1 class="game-title" style="background: linear-gradient(135deg, #f87171, #dc2626); -webkit-background-clip: text;">Crushed!</h1>
+        <div class="stats-box">
+            <div class="stat-row">
+                <span>Score</span>
+                <span class="stat-val" id="finalScore">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Best</span>
+                <span class="stat-val" id="finalBest">0</span>
+            </div>
+        </div>
+        <button class="btn" id="restartBtn">Try Again</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
+
+    // UI Elements
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const bestDisplay = document.getElementById('bestDisplay');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScoreEl = document.getElementById('finalScore');
+    const finalBestEl = document.getElementById('finalBest');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const hintLeft = document.getElementById('hint-left');
+    const hintRight = document.getElementById('hint-right');
+
+    // Game State
+    let width = 0;
+    let height = 0;
+    let groundHeight = 70;
+    let isPlaying = false;
+    let score = 0;
+    let highScore = 0;
+    let lastTime = 0;
+    let spawnTimer = 0;
+    let spawnInterval = 2.8;
+    let screenShake = 0;
+
+    // Input State
+    let moveDir = 0; // -1 left, 0 stop, 1 right
+    let activePointerId = null;
+    let keys = { left: false, right: false };
+
+    // Entities
+    let bullets = [];
+    let rocks = [];
+    let particles = [];
+    let clouds = [];
+
+    // Cannon Object
+    const cannon = {
+        x: 0,
+        y: 0,
+        width: 54,
+        height: 44,
+        speed: 420,
+        wheelRadius: 15,
+        wheelAngle: 0,
+        fireRate: 0.11, // seconds between shots
+        fireTimer: 0,
+        recoil: 0
+    };
+
+    // Rock Tier Definitions matching user prompt:
+    // Big = 10 -> Medium = 5 -> Tiny = 2 -> Gone
+    const ROCK_TIERS = {
+        3: { // Big
+            hp: 10,
+            radius: 46,
+            color: '#ef4444',
+            borderColor: '#991b1b',
+            highlight: '#fca5a5',
+            bounceVel: -660,
+            points: 10
+        },
+        2: { // Medium
+            hp: 5,
+            radius: 31,
+            color: '#f97316',
+            borderColor: '#9a3412',
+            highlight: '#fdba74',
+            bounceVel: -570,
+            points: 5
+        },
+        1: { // Tiny
+            hp: 2,
+            radius: 19,
+            color: '#eab308',
+            borderColor: '#854d0e',
+            highlight: '#fef08a',
+            bounceVel: -480,
+            points: 2
+        }
+    };
+
+    // Resize Canvas Responsively
+    function resize() {
+        const rect = container.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height;
+        canvas.width = width;
+        canvas.height = height;
+
+        cannon.y = height - groundHeight;
+        if (cannon.x === 0) {
+            cannon.x = width / 2;
+        } else {
+            cannon.x = Math.max(cannon.width / 2, Math.min(width - cannon.width / 2, cannon.x));
+        }
+    }
+
+    window.addEventListener('resize', resize);
+
+    // Initialize decorative background clouds
+    function initClouds() {
+        clouds = [];
+        for (let i = 0; i < 5; i++) {
+            clouds.push({
+                x: Math.random() * width,
+                y: 60 + Math.random() * (height * 0.45),
+                scale: 0.6 + Math.random() * 0.7,
+                speed: 12 + Math.random() * 18
+            });
+        }
+    }
+
+    // Input Handling: Click / Touch Left or Right side of screen
+    function updatePointerDirection(clientX) {
+        const rect = container.getBoundingClientRect();
+        const relX = clientX - rect.left;
+        if (relX < rect.width / 2) {
+            moveDir = -1;
+        } else {
+            moveDir = 1;
+        }
+        // Fade hints once player interacts
+        hintLeft.style.opacity = '0';
+        hintRight.style.opacity = '0';
+    }
+
+    container.addEventListener('pointerdown', (e) => {
+        if (!isPlaying) return;
+        if (e.target.tagName === 'BUTTON') return;
+        activePointerId = e.pointerId;
+        container.setPointerCapture(e.pointerId);
+        updatePointerDirection(e.clientX);
+    });
+
+    container.addEventListener('pointermove', (e) => {
+        if (!isPlaying || e.pointerId !== activePointerId) return;
+        updatePointerDirection(e.clientX);
+    });
+
+    function releasePointer(e) {
+        if (e.pointerId === activePointerId) {
+            activePointerId = null;
+            if (!keys.left && !keys.right) {
+                moveDir = 0;
+            }
+        }
+    }
+
+    container.addEventListener('pointerup', releasePointer);
+    container.addEventListener('pointercancel', releasePointer);
+
+    // Optional Keyboard support for desktop convenience
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+            keys.left = true;
+            moveDir = -1;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+            keys.right = true;
+            moveDir = 1;
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+            keys.left = false;
+            moveDir = keys.right ? 1 : 0;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+            keys.right = false;
+            moveDir = keys.left ? -1 : 0;
+        }
+    });
+
+    // Start / Reset Game
+    function startGame() {
+        resize();
+        bullets = [];
+        rocks = [];
+        particles = [];
+        score = 0;
+        scoreDisplay.textContent = '0';
+        spawnTimer = 0.5;
+        spawnInterval = 2.8;
+        moveDir = 0;
+        activePointerId = null;
+
+        cannon.x = width / 2;
+        cannon.y = height - groundHeight;
+        cannon.wheelAngle = 0;
+        cannon.fireTimer = 0;
+
+        hintLeft.style.opacity = '1';
+        hintRight.style.opacity = '1';
+
+        startScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+
+        // Spawn first rock immediately so action starts right away
+        spawnRock(3);
+
+        isPlaying = true;
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+
+    // Spawn a Rock from top or upper sides
+    function spawnRock(tier, customX, customY, customVx, customVy) {
+        const config = ROCK_TIERS[tier];
+        const margin = config.radius + 10;
+
+        let x = customX !== undefined ? customX : margin + Math.random() * (width - margin * 2);
+        let y = customY !== undefined ? customY : -config.radius - 10;
+        let vx = customVx !== undefined ? customVx : (Math.random() < 0.5 ? -1 : 1) * (75 + Math.random() * 65);
+        let vy = customVy !== undefined ? customVy : 60;
+
+        // Generate rocky polygon vertices for natural rock look
+        const vertices = [];
+        const pointsCount = 11;
+        for (let i = 0; i < pointsCount; i++) {
+            const angle = (i / pointsCount) * Math.PI * 2;
+            const variance = 0.88 + Math.sin(i * 3.7) * 0.12;
+            vertices.push({
+                angle: angle,
+                dist: config.radius * variance
+            });
+        }
+
+        rocks.push({
+            tier: tier,
+            hp: config.hp,
+            maxHp: config.hp,
+            radius: config.radius,
+            x: x,
+            y: y,
+            vx: vx,
+            vy: vy,
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 3,
+            hitFlash: 0,
+            vertices: vertices
+        });
+    }
+
+    // Create explosion/hit particles
+    function createParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 70 + Math.random() * 220;
+            particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 80,
+                size: 3 + Math.random() * 5,
+                color: color,
+                alpha: 1,
+                life: 0.35 + Math.random() * 0.3
+            });
+        }
+    }
+
+    // Main Update Loop
+    function update(dt) {
+        // Screen shake decay
+        if (screenShake > 0) {
+            screenShake = Math.max(0, screenShake - dt * 28);
+        }
+
+        // Update decorative clouds
+        for (const c of clouds) {
+            c.x += c.speed * dt;
+            if (c.x > width + 100) c.x = -100;
+        }
+
+        // Move Cannon
+        const prevX = cannon.x;
+        cannon.x += moveDir * cannon.speed * dt;
+        const halfW = cannon.width * 0.65;
+        cannon.x = Math.max(halfW, Math.min(width - halfW, cannon.x));
+
+        // Rotate wheels proportionally to distance traveled
+        const dx = cannon.x - prevX;
+        cannon.wheelAngle += dx / cannon.wheelRadius;
+
+        // Recoil recovery
+        if (cannon.recoil > 0) {
+            cannon.recoil = Math.max(0, cannon.recoil - dt * 45);
+        }
+
+        // Constantly shoot upwards
+        cannon.fireTimer -= dt;
+        if (cannon.fireTimer <= 0) {
+            cannon.fireTimer = cannon.fireRate;
+            cannon.recoil = 5;
+            bullets.push({
+                x: cannon.x,
+                y: cannon.y - cannon.height - 6,
+                radius: 5.5,
+                vy: -860
+            });
+        }
+
+        // Update Bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            b.y += b.vy * dt;
+            if (b.y < -20) {
+                bullets.splice(i, 1);
+            }
+        }
+
+        // Spawn Rocks periodically
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+            // Limit simultaneous big/medium rocks so screen stays fair & playable
+            const totalMass = rocks.reduce((acc, r) => acc + r.tier, 0);
+            if (totalMass < 12) {
+                // Mostly big rocks (10), occasionally medium (5)
+                const tierToSpawn = Math.random() < 0.72 ? 3 : 2;
+                spawnRock(tierToSpawn);
+            }
+            // Gradually speed up spawns slightly as score increases
+            spawnInterval = Math.max(1.5, 2.8 - score * 0.004);
+            spawnTimer = spawnInterval;
+        }
+
+        // Update Rocks
+        const gravity = 760;
+        const floorY = height - groundHeight;
+
+        for (let i = rocks.length - 1; i >= 0; i--) {
+            const r = rocks[i];
+            const config = ROCK_TIERS[r.tier];
+
+            r.vy += gravity * dt;
+            r.x += r.vx * dt;
+            r.y += r.vy * dt;
+            r.rotation += r.rotSpeed * dt;
+
+            if (r.hitFlash > 0) {
+                r.hitFlash = Math.max(0, r.hitFlash - dt * 8);
+            }
+
+            // Bounce off Left & Right walls
+            if (r.x - r.radius < 0) {
+                r.x = r.radius;
+                r.vx = Math.abs(r.vx);
+            } else if (r.x + r.radius > width) {
+                r.x = width - r.radius;
+                r.vx = -Math.abs(r.vx);
+            }
+
+            // Bounce off Ground
+            if (r.y + r.radius >= floorY) {
+                r.y = floorY - r.radius;
+                r.vy = config.bounceVel;
+            }
+
+            // Check Bullet Collisions
+            let rockDestroyed = false;
+            for (let j = bullets.length - 1; j >= 0; j--) {
+                const b = bullets[j];
+                const distX = b.x - r.x;
+                const distY = b.y - r.y;
+                const distSq = distX * distX + distY * distY;
+                const hitDist = r.radius + b.radius;
+
+                if (distSq <= hitDist * hitDist) {
+                    // Bullet hits rock & disappears (doesn't go back up)
+                    bullets.splice(j, 1);
+                    r.hp -= 1;
+                    r.hitFlash = 1;
+                    score += 1;
+                    scoreDisplay.textContent = score;
+
+                    createParticles(b.x, b.y, config.highlight, 4);
+
+                    if (r.hp <= 0) {
+                        rockDestroyed = true;
+                        screenShake = r.tier * 2.5;
+                        createParticles(r.x, r.y, config.color, 14);
+
+                        // Split in half if bigger than tiny (tier > 1)
+                        if (r.tier > 1) {
+                            const nextTier = r.tier - 1;
+                            const splitSpeedX = 115 + Math.random() * 45;
+                            const popUpVel = -340; // Small upward hop when splitting in half
+
+                            // Left half
+                            spawnRock(nextTier, r.x - 12, r.y, -splitSpeedX, popUpVel);
+                            // Right half
+                            spawnRock(nextTier, r.x + 12, r.y, splitSpeedX, popUpVel);
+                        }
+                        rocks.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            if (rockDestroyed) continue;
+
+            // Check Collision with Cannon (Game Over)
+            // Cannon hitbox centered slightly above ground
+            const cannonCenterX = cannon.x;
+            const cannonCenterY = cannon.y - 22;
+            const cannonHitRadius = 22;
+
+            const cdx = r.x - cannonCenterX;
+            const cdy = r.y - cannonCenterY;
+            const minSafeDist = r.radius + cannonHitRadius;
+
+            if (cdx * cdx + cdy * cdy < minSafeDist * minSafeDist) {
+                triggerGameOver();
+                return;
+            }
+        }
+
+        // Update Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.vy += 450 * dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+            p.alpha = Math.max(0, p.life * 2);
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+            }
+        }
+    }
+
+    function triggerGameOver() {
+        isPlaying = false;
+        screenShake = 12;
+        createParticles(cannon.x, cannon.y - 20, '#fbbf24', 25);
+
+        if (score > highScore) {
+            highScore = score;
+            bestDisplay.textContent = highScore;
+        }
+
+        finalScoreEl.textContent = score;
+        finalBestEl.textContent = highScore;
+        gameOverScreen.classList.remove('hidden');
+    }
+
+    // Draw Everything
+    function draw() {
+        ctx.save();
+
+        // Apply subtle camera shake
+        if (screenShake > 0) {
+            const sx = (Math.random() - 0.5) * screenShake;
+            const sy = (Math.random() - 0.5) * screenShake;
+            ctx.translate(sx, sy);
+        }
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw Background Clouds
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        for (const c of clouds) {
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 24 * c.scale, 0, Math.PI * 2);
+            ctx.arc(c.x + 20 * c.scale, c.y - 8 * c.scale, 28 * c.scale, 0, Math.PI * 2);
+            ctx.arc(c.x + 42 * c.scale, c.y, 22 * c.scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw Ground
+        const floorY = height - groundHeight;
+        // Grass top strip
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(0, floorY, width, 14);
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(0, floorY + 14, width, 5);
+        // Soil base
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(0, floorY + 19, width, groundHeight - 19);
+
+        // Draw Bullets
+        for (const b of bullets) {
+            ctx.save();
+            // Glow trail
+            const grad = ctx.createLinearGradient(b.x, b.y, b.x, b.y + 24);
+            grad.addColorStop(0, '#fef08a');
+            grad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(b.x - 3, b.y, 6, 24);
+
+            // Bullet head
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Draw Cannon with Wheels
+        drawCannon();
+
+        // Draw Rocks with Numbers
+        for (const r of rocks) {
+            drawRock(r);
+        }
+
+        // Draw Particles
+        for (const p of particles) {
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    function drawCannon() {
+        const cx = cannon.x;
+        const groundY = cannon.y;
+        const wheelY = groundY - cannon.wheelRadius;
+        const wheelOffset = 22;
+
+        ctx.save();
+
+        // Vertical Barrel (with shooting recoil)
+        const barrelW = 24;
+        const barrelH = 36;
+        const barrelTopY = groundY - cannon.wheelRadius - barrelH + cannon.recoil;
+
+        // Barrel body
+        ctx.fillStyle = '#334155';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(cx - barrelW / 2, barrelTopY, barrelW, barrelH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Barrel muzzle rim
+        ctx.fillStyle = '#475569';
+        ctx.beginPath();
+        ctx.roundRect(cx - barrelW / 2 - 3, barrelTopY - 3, barrelW + 6, 9, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Cannon Carriage / Base Body
+        ctx.fillStyle = '#2563eb';
+        ctx.beginPath();
+        ctx.arc(cx, wheelY - 4, 20, Math.PI, 0);
+        ctx.lineTo(cx + 26, wheelY + 4);
+        ctx.lineTo(cx - 26, wheelY + 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw Left & Right Wheels
+        drawWheel(cx - wheelOffset, wheelY, cannon.wheelRadius, cannon.wheelAngle);
+        drawWheel(cx + wheelOffset, wheelY, cannon.wheelRadius, cannon.wheelAngle);
+
+        ctx.restore();
+    }
+
+    function drawWheel(wx, wy, radius, angle) {
+        ctx.save();
+        ctx.translate(wx, wy);
+        ctx.rotate(angle);
+
+        // Tire
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Wooden/Metal Inner Rim
+        ctx.fillStyle = '#d97706';
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Wheel Spokes (so rotation is clearly visible when moving!)
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 2.5;
+        for (let i = 0; i < 4; i++) {
+            const a = (i * Math.PI) / 2;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * -radius * 0.65, Math.sin(a) * -radius * 0.65);
+            ctx.lineTo(Math.cos(a) * radius * 0.65, Math.sin(a) * radius * 0.65);
+            ctx.stroke();
+        }
+
+        // Center Hubcap
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawRock(r) {
+        const config = ROCK_TIERS[r.tier];
+
+        ctx.save();
+        ctx.translate(r.x, r.y);
+
+        // Rotate rock shape
+        ctx.save();
+        ctx.rotate(r.rotation);
+
+        ctx.beginPath();
+        r.vertices.forEach((v, idx) => {
+            const vx = Math.cos(v.angle) * v.dist;
+            const vy = Math.sin(v.angle) * v.dist;
+            if (idx === 0) ctx.moveTo(vx, vy);
+            else ctx.lineTo(vx, vy);
+        });
+        ctx.closePath();
+
+        // Fill rock (flashes white briefly when hit)
+        ctx.fillStyle = r.hitFlash > 0 ? '#ffffff' : config.color;
+        ctx.fill();
+
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = config.borderColor;
+        ctx.stroke();
+        ctx.restore();
+
+        // Draw Remaining Hit Number upright in the center
+        ctx.fillStyle = r.hitFlash > 0 ? '#0f172a' : '#ffffff';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.lineWidth = 4;
+        ctx.font = `900 ${Math.max(16, Math.floor(r.radius * 0.72))}px 'Segoe UI', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeText(r.hp, 0, 1);
+        ctx.fillText(r.hp, 0, 1);
+
+        ctx.restore();
+    }
+
+    // Main Animation Loop
+    function gameLoop(timestamp) {
+        if (!isPlaying) return;
+
+        const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+        lastTime = timestamp;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Initial render behind start screen
+    resize();
+    initClouds();
+    draw();
+</script>
+</body>
+</html>
+
+
